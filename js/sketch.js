@@ -611,13 +611,12 @@ function calculateGlobalScale(activeCount = 0) {
 
   let requiredSpace = maxRadius + symbolSize;
   let availableSpace = min(width, height) / 2;
-  availableSpace *= 1.3; // 여백 -30% (화면보다 30% 더 크게 허용)
+  availableSpace *= 1.3;
 
   if (requiredSpace > availableSpace) {
     return availableSpace / requiredSpace;
   }
 
-  // 기본 스케일 1.0으로 복원
   return 1.0;
 }
 
@@ -626,7 +625,6 @@ function renderVisualLayers(activeCount = 0) {
   currentScale = lerp(currentScale, targetScale, SCALE_LERP_AMOUNT);
   let globalScale = currentScale;
 
-  // 완성된 만트라들을 birthOrder 내림차순 정렬 (최신이 앞에)
   let sortedMantras = [...completedMantras].sort(
     (a, b) => b.birthOrder - a.birthOrder
   );
@@ -634,82 +632,64 @@ function renderVisualLayers(activeCount = 0) {
   for (let i = 0; i < sortedMantras.length; i++) {
     let mantra = sortedMantras[i];
 
-    // 정렬된 배열에서의 인덱스 = 목표 링 인덱스
     let targetRingIndex = i;
 
-    // 처음 생성될 때만 animatedRingIndex 초기화
     if (mantra.animatedRingIndex === undefined) {
-      // 첫 번째 만트라(birthOrder=0)는 즉시 목표 위치에 배치
       if (mantra.birthOrder === 0) {
         mantra.animatedRingIndex = targetRingIndex;
       } else {
-        // 두 번째 이후는 중앙에서 시작하여 애니메이션
         mantra.animatedRingIndex = 0;
       }
     }
 
-    // 이전 목표 링 인덱스 저장 (처음 초기화)
     if (mantra.prevTargetRingIndex === undefined) {
       mantra.prevTargetRingIndex = targetRingIndex;
     }
 
-    // 목표 링이 변경되었는지 확인 (새로운 만다라가 밀어냄)
     let isPushedOut = targetRingIndex > mantra.prevTargetRingIndex;
     if (isPushedOut) {
       mantra.prevTargetRingIndex = targetRingIndex;
-      // 밀려날 때 확장 애니메이션 시작
       if (!mantra.pushScale) mantra.pushScale = 1.0;
-      mantra.targetPushScale = 1.15; // 15% 확장
+      mantra.targetPushScale = 1.15;
     }
 
-    // 목표 링으로 부드럽게 이동 (안쪽에서 바깥쪽으로)
     mantra.animatedRingIndex = lerp(
       mantra.animatedRingIndex,
       targetRingIndex,
       0.08
     );
 
-    // 반지름 계산: ring 0이 진행중인 만트라 위치이므로, 완성된 만트라는 +1부터 시작
     let radius = baseRadius + (mantra.animatedRingIndex + 1) * ringSpacing;
 
     let mantraAlpha = 255;
     let mantraScale = 1.0;
     let age = millis() - mantra.createdTime;
 
-    // 새로 생성된 만다라 초기 등장 애니메이션
     if (mantra.isNewlyCreated) {
-      // 생성 후 1초 동안 등장 애니메이션 적용
       let birthAge = age;
-      let birthDuration = 1000; // 1초
+      let birthDuration = 1000;
 
       if (birthAge < birthDuration) {
         let birthProgress = birthAge / birthDuration;
-        // ease-out cubic으로 부드럽게 확대
         let eased = 1 - pow(1 - birthProgress, 3);
 
-        // 30%에서 100%로 확대되며 등장
         let birthScale = 0.3 + eased * 0.7;
         mantra.currentScale = birthScale;
 
-        // 투명도도 페이드인
         mantraAlpha = 255 * eased;
       } else {
-        // 등장 애니메이션 완료
         mantra.isNewlyCreated = false;
       }
     }
 
-    // 밀려나는 확장 효과 처리
     if (!mantra.pushScale) mantra.pushScale = 1.0;
     if (!mantra.targetPushScale) mantra.targetPushScale = 1.0;
 
-    // 확장 후 원래 크기로 부드럽게 복귀
     mantra.pushScale = lerp(mantra.pushScale, mantra.targetPushScale, 0.1);
     if (mantra.pushScale > 1.01) {
       mantra.targetPushScale = lerp(mantra.targetPushScale, 1.0, 0.05);
     }
 
-    // 페이드아웃 처리 (바깥으로 밀려나면서 자연스럽게 확장)
     if (age > MANTRA_LIFETIME) {
       let fadeProgress = (age - MANTRA_LIFETIME) / MANTRA_FADEOUT_TIME;
       fadeProgress = constrain(fadeProgress, 0, 1);
@@ -721,37 +701,30 @@ function renderVisualLayers(activeCount = 0) {
 
       mantraAlpha = 255 * (1 - eased);
 
-      // 바깥으로 나가면서 점진적으로 크기 증가 (1.0 → 1.6)
       mantra.targetScale = 1.0 + eased * 0.6;
 
-      // 바깥으로 밀려나는 효과 (animatedRingIndex 증가, 더 부드럽게)
       mantra.animatedRingIndex += eased * 0.5;
     } else if (!mantra.isNewlyCreated) {
-      // 페이드아웃 전이고 등장 애니메이션 완료: 밀려나는 확장 효과 적용
       mantra.targetScale = mantra.pushScale;
     }
 
     if (!mantra.currentScale) mantra.currentScale = 1.0;
 
-    // 등장 애니메이션 중이 아닐 때만 보간 적용
     if (!mantra.isNewlyCreated) {
       mantra.currentScale = lerp(mantra.currentScale, mantra.targetScale, 0.08);
     }
 
     mantraScale = mantra.currentScale;
 
-    // 심볼 개수와 이미지 인덱스 먼저 가져오기
     let symbolCount = mantra.symbolCount || SYMBOLS_PER_MANTRA;
 
-    // 위치에 따라 동적으로 이미지 인덱스 결정 (4→3→2→1)
-    // targetRingIndex: 0=첫번째링, 1=두번째링, 2=세번째링, 3=네번째링...
     let imageIndex;
     if (targetRingIndex === 0) {
-      imageIndex = 2; // 첫 번째 링 → 3번 이미지 (세 번째로 진함)
+      imageIndex = 2;
     } else if (targetRingIndex === 1) {
-      imageIndex = 1; // 두 번째 링 → 2번 이미지 (두 번째로 진함)
+      imageIndex = 1;
     } else {
-      imageIndex = 0; // 세 번째 링 이후 → 1번 이미지 (가장 연함)
+      imageIndex = 0;
     }
 
     push();
@@ -764,7 +737,6 @@ function renderVisualLayers(activeCount = 0) {
     push();
     translate(width / 2, height / 2);
     noFill();
-    // 만다라 색상에 맞춰 원형 선 색상 설정
     let ringColor = color(MANDALA_COLORS[imageIndex]);
     stroke(
       red(ringColor),
@@ -792,7 +764,6 @@ function renderVisualLayers(activeCount = 0) {
   }
 
   if (activeCount > 0) {
-    // 진행 중인 만트라는 항상 첫 번째 링(중앙)에 표시
     let ringIndex = 0;
     let radius = baseRadius + ringIndex * ringSpacing;
 
@@ -802,8 +773,7 @@ function renderVisualLayers(activeCount = 0) {
       0.2
     );
 
-    // 진행 중인 만다라는 항상 4번 이미지(인덱스 3) 사용
-    let progressImageIndex = 3; // 4번 이미지
+    let progressImageIndex = 3;
 
     push();
     translate(width / 2, height / 2);
@@ -814,7 +784,6 @@ function renderVisualLayers(activeCount = 0) {
     push();
     translate(width / 2, height / 2);
     noFill();
-    // 진행 중인 만트라는 4번 이미지 색상 사용
     let progressRingColor = color(MANDALA_COLORS[progressImageIndex]);
     stroke(
       red(progressRingColor),
@@ -838,7 +807,7 @@ function renderVisualLayers(activeCount = 0) {
   }
 }
 
-// 만다라 심볼 그리기 (이미지 + 장식 텍스트)
+// Mandala symbol
 function drawMantraSymbol(angle, radius, scale, alpha, imageIndex = null) {
   if (mantraImages.length === 0) return;
 
@@ -846,7 +815,7 @@ function drawMantraSymbol(angle, radius, scale, alpha, imageIndex = null) {
   translate(width / 2, height / 2);
   rotate(angle);
 
-  // DECOR_TEXT_OFFSET을 적용하여 만다라 중심점 위치 조정
+  // DECOR_TEXT_OFFSET
   let adjustedRadius = radius + DECOR_TEXT_OFFSET;
   translate(adjustedRadius, 0);
   rotate(HALF_PI + PI);
@@ -855,7 +824,7 @@ function drawMantraSymbol(angle, radius, scale, alpha, imageIndex = null) {
   let imgWidth = symbolSize * symbolAspectRatio * finalScale;
   let imgHeight = symbolSize * finalScale;
 
-  // 이미지 선택
+  // image selection
   let selectedImage;
   if (
     imageIndex !== null &&
@@ -872,19 +841,18 @@ function drawMantraSymbol(angle, radius, scale, alpha, imageIndex = null) {
     return;
   }
 
-  // 만다라 이미지 그리기
+  // draw
   tint(255, alpha);
   imageMode(CENTER);
   image(selectedImage, 0, 0, imgWidth, imgHeight);
   noTint();
 
-  // 장식 텍스트 효과 추가
   drawDecorativeText(imgWidth, imgHeight, alpha, imageIndex);
 
   pop();
 }
 
-// 장식 효과 - 영어 단어를 원형으로 배치하며 회전
+// decorative text around symbol
 function drawDecorativeText(imgWidth, imgHeight, alpha, seedIndex) {
   let words = [
     "NAME",
@@ -897,10 +865,8 @@ function drawDecorativeText(imgWidth, imgHeight, alpha, seedIndex) {
   ];
   let wordCount = words.length;
 
-  // 설정 가능한 반지름 사용
   let decorRadius = imgWidth * DECOR_TEXT_RADIUS_RATIO;
 
-  // 만다라 색상 가져오기
   let mandalaColor = MANDALA_COLORS[seedIndex % MANDALA_COLORS.length];
 
   push();
@@ -910,19 +876,16 @@ function drawDecorativeText(imgWidth, imgHeight, alpha, seedIndex) {
   }
 
   for (let i = 0; i < wordCount; i++) {
-    // frameCount를 이용한 회전 효과 (시계방향으로 회전 - 중심원과 동일)
-    let baseAngle = (i * TWO_PI) / wordCount - HALF_PI; // -90도부터 시작
-    let rotationOffset = frameCount * DECOR_TEXT_ROTATION_SPEED; // 시계방향 (양수)
+    let baseAngle = (i * TWO_PI) / wordCount - HALF_PI;
+    let rotationOffset = frameCount * DECOR_TEXT_ROTATION_SPEED;
     let angle = baseAngle + rotationOffset;
 
-    // X/Y 중심점 조정 적용
     let x = cos(angle) * decorRadius + DECOR_TEXT_CENTER_X;
     let y = sin(angle) * decorRadius + DECOR_TEXT_CENTER_Y;
 
     push();
     translate(x, y);
 
-    // 텍스트가 바깥쪽을 향하도록 회전
     let textRotation = angle + HALF_PI;
     rotate(textRotation);
 
