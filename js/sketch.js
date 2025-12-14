@@ -58,14 +58,10 @@ let decorFont; // 만다라 주변 장식 텍스트용 폰트 (Tikkeul)
 let mantraImg; // 만트라 심볼 이미지 (레거시, 사용 안 함)
 let mantraImages = []; // 6개의 만다라 이미지 배열
 
-// 만다라 색상 코드 (1~6) - visual.js와 동기화
+// 만다라 색상 코드 (2개만 번갈아 사용)
 const MANDALA_COLORS = [
-  "#ae00ff", // 만다라 1
-  "#ffffff", // 만다라 2
-  "#00ff2a", // 만다라 3
-  "#ffe000", // 만다라 4
-  "#0000ff", // 만다라 5
-  "#ff0000", // 만다라 6
+  "#fefff0", // 만다라 1 (밝은 크림색)
+  "#ffec7b", // 만다라 2 (밝은 노란색)
 ];
 
 // 텍스트 만다라용 패턴 정의 - 원형 패턴만 사용
@@ -146,7 +142,7 @@ let targetScale = 1.0; // 목표 스케일 값
 const SCALE_LERP_AMOUNT = 0.03; // 스케일 보간 속도 (0~1, 작을수록 부드럽게) - 더 부드럽게 (0.05 → 0.03)
 
 // 만다라 이미지 개수
-const MANTRA_IMAGE_COUNT = 6;
+const MANTRA_IMAGE_COUNT = 2;
 
 // 주기도문 텍스트 (단어별로 분리)
 const LORDS_PRAYER = [
@@ -210,13 +206,13 @@ const LORDS_PRAYER = [
 // ============================================
 
 function preload() {
-  // 6개의 만다라 PNG 이미지 로드
-  for (let i = 0; i < 6; i++) {
+  // 2개의 만다라 PNG 이미지 로드
+  for (let i = 0; i < 2; i++) {
     const imageNumber = i + 1;
     const index = i;
 
     let img = loadImage(
-      `source/mandara${imageNumber}.png`,
+      `source/mandala${imageNumber}.png`,
       () => {
         console.log(
           `✅ 만다라 이미지 ${imageNumber} 로드 완료 (인덱스: ${index})`
@@ -611,8 +607,8 @@ function updateLocalTouchState(isActive, normalizedX, normalizedY) {
 // ============================================
 
 function draw() {
-  // 배경 (검은색)
-  background(0);
+  // 배경 (#0d1235)
+  background("#0d1235");
 
   // 만트라 완성 진행도 업데이트
   const activeCount = updateCompletionProgress();
