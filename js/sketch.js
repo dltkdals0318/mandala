@@ -1,9 +1,9 @@
 // ============================================
-// 디지털 공동체 만트라 - Digital Collective Mantra
+// Digital Mandala
 // ============================================
 
 // ============================================
-// 1. Firebase 설정 및 초기화
+// Firebase reset
 // ============================================
 
 const firebaseConfig = {
@@ -34,7 +34,7 @@ let userId;
 let heartbeatInterval = null;
 
 // ============================================
-// 2. 전역 상태 변수
+// 전역 상태 변수
 // ============================================
 
 let connectedUsers = 0;
@@ -163,33 +163,23 @@ function preload() {
     let img = loadImage(
       `source/mandala${imageNumber}.png`,
       () => {
-        console.log(
-          `✅ 만다라 이미지 ${imageNumber} 로드 완료 (인덱스: ${index})`
-        );
         if (index === 0) {
           symbolAspectRatio = mantraImages[0].width / mantraImages[0].height;
-          console.log(
-            "이미지 크기:",
-            mantraImages[0].width,
-            "x",
-            mantraImages[0].height
-          );
         }
       },
-      () => console.error(`❌ 만다라 이미지 ${imageNumber} 로드 실패`)
+      () => {}
     );
     mantraImages[index] = img;
   }
   mantraImg = mantraImages[0];
   prayerSound = loadSound(
     "source/pray.mp3",
-    () => console.log("✅ 기도 오디오 로드 완료"),
-    () => console.error("❌ 기도 오디오 로드 실패")
+    () => {},
+    () => {}
   );
   prayerFont = "Ohmin";
   titleFont = "Ohmin";
   decorFont = "Tikkeul";
-  console.log("✅ CSS 폰트 'Ohmin', 'Tikkeul' 설정 완료");
 }
 
 // ============================================
@@ -209,7 +199,6 @@ function setup() {
     initFirebase();
   } else {
     if (!testMode) {
-      console.warn("Firebase 설정이 준비되지 않아 테스트 모드로 전환합니다.");
       testMode = true;
     }
     initTestMode();
@@ -217,8 +206,6 @@ function setup() {
   initAudio();
   textAlign(LEFT, TOP);
   textFont("monospace");
-  console.log("디지털 만트라 시스템 초기화 완료");
-  console.log(`사용자 ID: ${userId}`);
 }
 
 // ============================================
@@ -267,10 +254,7 @@ function initFirebase() {
           });
         }
       }, 10000);
-
-      console.log("Firebase 연결됨:", userId);
     } else {
-      console.log("Firebase 연결 끊김");
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
         heartbeatInterval = null;
@@ -284,12 +268,9 @@ function initFirebase() {
   // 초기 정리 (페이지 로드 시 한번 실행)
   setTimeout(() => {
     usersRef.once("value", (snapshot) => {
-      console.log("초기 데이터베이스 정리 시작...");
       cleanupStaleConnections(snapshot);
     });
   }, 2000); // 2초 후 실행
-
-  console.log("Firebase 초기화 완료");
 }
 
 function initTestMode() {
@@ -302,7 +283,6 @@ function initTestMode() {
   };
 
   refreshConnectionCount();
-  console.log("테스트 모드 활성화 - Firebase 없이 로컬로 동작합니다.");
 }
 
 // ============================================
@@ -313,7 +293,6 @@ function setupPresenceTracking() {
   // 전체 사용자 목록 변경 감지
   usersRef.on("value", (snapshot) => {
     connectedUsers = snapshot.numChildren();
-    console.log(`현재 접속자: ${connectedUsers}명`);
 
     // 오래된 연결 정리 (60초 이상 lastSeen 업데이트 없음)
     cleanupStaleConnections(snapshot);
@@ -323,8 +302,6 @@ function setupPresenceTracking() {
   usersRef.on("child_added", (snapshot) => {
     const user = snapshot.val();
     const uid = snapshot.key;
-
-    console.log(`사용자 접속: ${uid}`);
 
     // 로컬 활성 터치 데이터에 추가
     activeTouches[uid] = {
@@ -351,7 +328,6 @@ function setupPresenceTracking() {
   // 사용자 연결 해제
   usersRef.on("child_removed", (snapshot) => {
     const uid = snapshot.key;
-    console.log(`사용자 퇴장: ${uid}`);
 
     // 로컬 데이터에서 삭제
     delete activeTouches[uid];
@@ -369,7 +345,6 @@ function cleanupStaleConnections(snapshot) {
 
     // lastSeen이 없는 오래된 데이터는 무조건 제거
     if (!user.lastSeen) {
-      console.log(`오래된 데이터 제거 (lastSeen 없음): ${uid}`);
       usersRef.child(uid).remove();
       return;
     }
@@ -379,11 +354,6 @@ function cleanupStaleConnections(snapshot) {
 
     // 30초 이상 업데이트 없으면 제거
     if (timeSinceLastSeen > TIMEOUT) {
-      console.log(
-        `비활성 연결 제거: ${uid} (마지막 활동: ${Math.floor(
-          timeSinceLastSeen / 1000
-        )}초 전)`
-      );
       usersRef.child(uid).remove();
     }
   });
@@ -452,8 +422,6 @@ function touchStarted() {
       updateLocalTouchState(true, normalizedX, normalizedY);
     }
 
-    console.log("터치 시작:", mouseX, mouseY);
-
     // 기본 동작 방지 (모바일 스크롤 등)
     return false;
   }
@@ -493,7 +461,6 @@ function touchEnded() {
     updateLocalTouchState(false);
   }
 
-  console.log("터치 종료");
   return false;
 }
 
@@ -1265,18 +1232,12 @@ function refreshConnectionCount() {
 function updateMantraLifetime() {
   // 생존 시간이 지난 만트라들을 필터링하여 제거
   let currentTime = millis();
-  let initialLength = completedMantras.length;
 
   completedMantras = completedMantras.filter((mantra) => {
     let age = currentTime - mantra.createdTime;
     // 생존 시간 + 페이드아웃 시간이 지나면 제거
     return age < MANTRA_LIFETIME + MANTRA_FADEOUT_TIME;
   });
-
-  // 제거된 만트라가 있으면 로그 출력
-  if (completedMantras.length < initialLength) {
-    console.log(`만트라 자동 제거 - 현재 ${completedMantras.length}개 남음`);
-  }
 }
 
 // 만트라 완성 진행도 업데이트
@@ -1288,10 +1249,6 @@ function updateCompletionProgress() {
     // 사람 수가 변경되면 진행도 초기화 (2명 이상일 때만)
     touchStartTime = millis();
     currentProgress = 0;
-    // 회전은 현재 위치에서 부드럽게 계속 (초기화 안 함)
-    console.log(
-      `인원 변경 (${lastActiveCount}명 → ${activeCount}명) - 진행도 초기화`
-    );
 
     // 기도 오디오 재시작
     if (prayerSound) {
@@ -1299,7 +1256,6 @@ function updateCompletionProgress() {
         prayerSound.stop();
       }
       prayerSound.play();
-      console.log("🔄 기도 오디오 재시작 (인원 변경)");
     }
   }
 
@@ -1308,12 +1264,10 @@ function updateCompletionProgress() {
     // 처음 터치 시작 (완성된 적이 없을 때만)
     if (touchStartTime === 0 && !hasCompletedCurrentMantra) {
       touchStartTime = millis();
-      console.log(`${activeCount}명이 터치 시작 - 진행 중`);
 
       // 기도 오디오 재생 시작
       if (prayerSound && !prayerSound.isPlaying()) {
         prayerSound.play();
-        console.log("🎵 기도 오디오 재생 시작");
       }
     }
 
@@ -1371,19 +1325,10 @@ function updateCompletionProgress() {
 
       totalMantraCount++; // 전체 생성 횟수 증가
 
-      console.log(`✨ 만트라 완성! #${totalMantraCount}`);
-
       // 최대 개수 제한 (오래된 것부터 제거)
       if (completedMantras.length > MAX_MANTRAS) {
         completedMantras.shift(); // 가장 오래된 만트라 제거
-        console.log(
-          `오래된 만트라 제거 - 현재 ${completedMantras.length}개 유지`
-        );
       }
-
-      console.log(
-        `만트라 완성! (${activeCount}명 참여) - 총 ${completedMantras.length}개`
-      );
 
       // 회전은 연속적으로 유지 (초기화 안 함)
     }
@@ -1400,7 +1345,6 @@ function updateCompletionProgress() {
     // 기도 오디오 정지
     if (prayerSound && prayerSound.isPlaying()) {
       prayerSound.stop();
-      console.log("🔇 기도 오디오 정지 (1명)");
     }
   } else {
     // 아무도 없으면 진행도만 초기화 (회전은 부드럽게 감속)
@@ -1413,7 +1357,6 @@ function updateCompletionProgress() {
     // 기도 오디오 정지
     if (prayerSound && prayerSound.isPlaying()) {
       prayerSound.stop();
-      console.log("🔇 기도 오디오 정지 (0명)");
     }
   }
 
@@ -1431,13 +1374,6 @@ function calculateResponsiveSizes() {
   baseRadius = diagonal * BASE_RADIUS_RATIO;
   ringSpacing = diagonal * RING_SPACING_RATIO;
   symbolSize = diagonal * SYMBOL_SIZE_RATIO;
-
-  console.log("반응형 크기:", {
-    diagonal: diagonal.toFixed(0),
-    baseRadius: baseRadius.toFixed(0),
-    ringSpacing: ringSpacing.toFixed(0),
-    symbolSize: symbolSize.toFixed(0),
-  });
 }
 
 // 윈도우 크기 변경 대응
@@ -1466,8 +1402,6 @@ function createVirtualUser() {
   };
 
   refreshConnectionCount();
-
-  console.log("가상 사용자 추가:", virtualUserId, "(총", connectedUsers, "명)");
 }
 
 // 가상 사용자 제거
@@ -1476,14 +1410,6 @@ function removeVirtualUser() {
     let removedUserId = virtualUsers.pop();
     delete activeTouches[removedUserId];
     refreshConnectionCount();
-
-    console.log(
-      "가상 사용자 제거:",
-      removedUserId,
-      "(총",
-      connectedUsers,
-      "명)"
-    );
   }
 }
 
@@ -1495,8 +1421,6 @@ function removeAllVirtualUsers() {
 
   virtualUsers = [];
   refreshConnectionCount();
-
-  console.log("모든 가상 사용자 제거");
 }
 
 // 특정 개수의 가상 사용자 설정
@@ -1508,8 +1432,6 @@ function setVirtualUserCount(count) {
   for (let i = 0; i < count; i++) {
     createVirtualUser();
   }
-
-  console.log(`가상 사용자 ${count}명으로 설정됨`);
 }
 
 // 키보드 입력 처리
