@@ -6,8 +6,6 @@
 // 1. Firebase 설정 및 초기화
 // ============================================
 
-// Firebase 설정 (sm-mandara 프로젝트)
-// Firebase SDK는 index.html에서 로드됨 (compat 버전)
 const firebaseConfig = {
   apiKey: "AIzaSyB1eT-iQ9VwSOsF9fbrw_W1xqRXQ1geRFE",
   authDomain: "sm-mandara.firebaseapp.com",
@@ -29,124 +27,77 @@ function isFirebaseConfigValid(config) {
   });
 }
 
-// Firebase 초기화
 let database;
 let usersRef;
 let myConnectionRef;
 let userId;
-let heartbeatInterval = null; // heartbeat 인터벌 ID 저장
+let heartbeatInterval = null;
 
 // ============================================
 // 2. 전역 상태 변수
 // ============================================
 
-// 접속자 관리
 let connectedUsers = 0;
-let activeTouches = {}; // 모든 사용자의 터치 데이터 저장
+let activeTouches = {};
+let audioLayers = [];
+const MAX_LAYERS = 7;
+let prayerSound;
+let prayerFont;
+let titleFont;
+let decorFont;
+let mantraImg;
+let mantraImages = [];
 
-// 오디오 관리
-let audioLayers = []; // 7개의 오디오 레이어
-const MAX_LAYERS = 7; // 최대 레이어 수 (완전한 만트라를 위해 필요한 사람 수)
-let prayerSound; // 기도 오디오 (pray.mp3)
+const MANDALA_COLORS = ["#fefff0", "#fffae3", "#fff1ae", "#ffec7b"];
+const TEXT_PATTERNS = ["circular"];
 
-// 폰트 관리
-let prayerFont; // 주기도문 텍스트용 폰트
-let titleFont; // "하나님의 자녀" 타이틀용 폰트
-let decorFont; // 만다라 주변 장식 텍스트용 폰트 (Tikkeul)
-
-// 비주얼 관리
-let mantraImg; // 만트라 심볼 이미지 (레거시, 사용 안 함)
-let mantraImages = []; // 6개의 만다라 이미지 배열
-
-// 만다라 색상 코드 (4개)
-const MANDALA_COLORS = [
-  "#fefff0", // 만다라 1
-  "#fffae3", // 만다라 2
-  "#fff1ae", // 만다라 3
-  "#ffec7b", // 만다라 4
-];
-
-// 텍스트 만다라용 패턴 정의 - 원형 패턴만 사용
-const TEXT_PATTERNS = [
-  "circular", // 원형 패턴 (유일한 패턴)
-];
-
-// 완성 플래시 효과
 let completionFlash = {
   active: false,
   startTime: 0,
-  duration: 400, // 0.4초로 단축
+  duration: 400,
 };
 
-// 반응형 크기 설정 (화면 크기의 비율) - 2배로 증가
-let BASE_RADIUS_RATIO = 0.96; // 0.48 * 2
-let RING_SPACING_RATIO = 0.72; // 0.36 * 2
-let SYMBOL_SIZE_RATIO = 1.2; // 0.60 * 2
+let BASE_RADIUS_RATIO = 0.96;
+let RING_SPACING_RATIO = 0.72;
+let SYMBOL_SIZE_RATIO = 1.2;
+let DECOR_TEXT_RADIUS_RATIO = 0.6;
+let DECOR_TEXT_OFFSET = 0;
+let DECOR_TEXT_CENTER_X = 40;
+let DECOR_TEXT_CENTER_Y = -140;
+let DECOR_TEXT_ROTATION_SPEED = 0.0125;
 
-// ===== 만다라 주변 텍스트 회전 설정 (여기서 조정 가능) =====
-let DECOR_TEXT_RADIUS_RATIO = 0.6; // 이미지 크기 대비 텍스트 반지름 (0.0 ~ 1.0)
-// 0.3 = 이미지에 매우 가깝게, 0.5 = 중간, 0.7 = 이미지에서 멀게
-
-let DECOR_TEXT_OFFSET = 0; // 만다라 중심점으로부터 추가 거리 (픽셀)
-// 음수 = 안쪽으로, 0 = 변화없음, 양수 = 바깥쪽으로
-
-let DECOR_TEXT_CENTER_X = 40; // 텍스트 원의 중심점 X축 조정 (픽셀)
-// 음수 = 왼쪽으로, 0 = 변화없음, 양수 = 오른쪽으로
-// 예: -10 = 왼쪽으로 10px, 10 = 오른쪽으로 10px
-
-let DECOR_TEXT_CENTER_Y = -140; // 텍스트 원의 중심점 Y축 조정 (픽셀)
-// 음수 = 위쪽으로, 0 = 변화없음, 양수 = 아래쪽으로
-// 예: -10 = 위쪽으로 10px, 10 = 아래쪽으로 10px
-
-let DECOR_TEXT_ROTATION_SPEED = 0.0125; // 텍스트 회전 속도
-// 0.005 = 매우 느리게, 0.01 = 보통, 0.02 = 빠르게
-// ========================================================
-
-// 실제 픽셀 크기 (화면 크기에 따라 계산됨)
 let baseRadius = 150;
 let ringSpacing = 100;
-let symbolSize = 120; // 기본 60 * 2
-
-let symbolAspectRatio = 1; // 이미지 비율 (width/height)
-
-// 업데이트 쓰로틀링
+let symbolSize = 120;
+let symbolAspectRatio = 1;
 let lastUpdate = 0;
-const UPDATE_INTERVAL = 50; // 50ms마다 업데이트 (초당 20회)
+const UPDATE_INTERVAL = 50;
+let testMode = false;
+let virtualUsers = [];
 
-// 테스트 모드 (키패드로 가상 사용자 추가/제거)
-// 주의: GitHub Pages 배포 시 반드시 false로 설정!
-let testMode = false; // false로 설정하면 실제 Firebase 모드
-let virtualUsers = []; // 가상 사용자 목록
-
-// 만트라 완성 시간 설정
-const COMPLETION_TIME = 27000; // 27초 동안 터치 유지 필요 (밀리초) - pray.mp3 길이에 맞춤
-const SYMBOLS_PER_MANTRA = 7; // 한 만트라당 심볼 개수
-const MAX_MANTRAS = 3; // 최대 만트라 개수 (성능 최적화: 5 → 3)
-const MANTRA_LIFETIME = 60000; // 만트라 생존 시간 (60초로 증가)
-const MANTRA_FADEOUT_TIME = 10000; // 페이드아웃 시간 (10초로 증가)
-const COMPLETION_FADEOUT_TIME = 2000; // 완성 후 텍스트 페이드아웃 시간 (2초로 증가)
-let touchStartTime = 0; // 터치 시작 시간
-let currentProgress = 0; // 현재 진행도 (0~1)
-let completedMantras = []; // 완성된 만트라들의 배열
-let totalMantraCount = 0; // 전체 만트라 생성 횟수 (제거되어도 계속 증가)
-let currentMantraRotation = 0; // 현재 진행 중인 만트라의 회전 각도
-let animatedMantraRotation = 0; // 부드럽게 보간된 회전 각도
-const ROTATION_SPEED = 0.005; // 회전 속도 (라디안/프레임)
-let lastActiveCount = 0; // 이전 프레임의 활성 사용자 수
-let completionFadeoutStart = 0; // 완성 후 페이드아웃 시작 시간
-let isCompletionFadingOut = false; // 완성 후 페이드아웃 중인지 여부
-let fadingOutImageIndex = 0; // 페이드아웃 중인 만다라의 이미지 인덱스 (이전 색상 유지용)
-let hasCompletedCurrentMantra = false; // 현재 세션에서 만트라 완성 여부
-
-// 스케일 애니메이션
-let currentScale = 1.0; // 현재 스케일 값
-let targetScale = 1.0; // 목표 스케일 값
-const SCALE_LERP_AMOUNT = 0.03; // 스케일 보간 속도 (0~1, 작을수록 부드럽게) - 더 부드럽게 (0.05 → 0.03)
-
-// 만다라 이미지 개수
+const COMPLETION_TIME = 27000;
+const SYMBOLS_PER_MANTRA = 7;
+const MAX_MANTRAS = 3;
+const MANTRA_LIFETIME = 60000;
+const MANTRA_FADEOUT_TIME = 10000;
+const COMPLETION_FADEOUT_TIME = 2000;
+let touchStartTime = 0;
+let currentProgress = 0;
+let completedMantras = [];
+let totalMantraCount = 0;
+let currentMantraRotation = 0;
+let animatedMantraRotation = 0;
+const ROTATION_SPEED = 0.005;
+let lastActiveCount = 0;
+let completionFadeoutStart = 0;
+let isCompletionFadingOut = false;
+let fadingOutImageIndex = 0;
+let hasCompletedCurrentMantra = false;
+let currentScale = 1.0;
+let targetScale = 1.0;
+const SCALE_LERP_AMOUNT = 0.03;
 const MANTRA_IMAGE_COUNT = 4;
 
-// 주기도문 텍스트 (단어별로 분리)
 const LORDS_PRAYER = [
   "하늘에",
   "계신",
@@ -201,18 +152,14 @@ const LORDS_PRAYER = [
   "있사옵나이다.",
 ];
 
-// 후광/입자 효과는 성능 문제로 제거됨
-
 // ============================================
-// 3. p5.js 프리로드 - 오디오 파일 로딩
+// 3. p5.js 프리로드
 // ============================================
 
 function preload() {
-  // 4개의 만다라 PNG 이미지 로드
   for (let i = 0; i < 4; i++) {
     const imageNumber = i + 1;
     const index = i;
-
     let img = loadImage(
       `source/mandala${imageNumber}.png`,
       () => {
@@ -233,17 +180,12 @@ function preload() {
     );
     mantraImages[index] = img;
   }
-
   mantraImg = mantraImages[0];
-
-  // 기도 오디오 파일 로드
   prayerSound = loadSound(
     "source/pray.mp3",
     () => console.log("✅ 기도 오디오 로드 완료"),
     () => console.error("❌ 기도 오디오 로드 실패")
   );
-
-  // 폰트는 CSS @font-face로 로드됨
   prayerFont = "Ohmin";
   titleFont = "Ohmin";
   decorFont = "Tikkeul";
@@ -255,13 +197,8 @@ function preload() {
 // ============================================
 
 function setup() {
-  // 캔버스 생성 (전체 화면) - P2D 렌더러로 성능 최적화
   createCanvas(windowWidth, windowHeight, P2D);
-
-  // 텍스트 렌더링 최적화
   textFont("Ohmin");
-
-  // 반응형 크기 계산
   calculateResponsiveSizes();
 
   const firebaseAvailable = typeof firebase !== "undefined";
@@ -277,14 +214,9 @@ function setup() {
     }
     initTestMode();
   }
-
-  // 오디오 초기화
   initAudio();
-
-  // 시각적 설정
   textAlign(LEFT, TOP);
   textFont("monospace");
-
   console.log("디지털 만트라 시스템 초기화 완료");
   console.log(`사용자 ID: ${userId}`);
 }
@@ -610,7 +542,7 @@ function updateLocalTouchState(isActive, normalizedX, normalizedY) {
 
 function draw() {
   // 배경 (#0d1235)
-  background("#0d1235");
+  background("#111320ff");
 
   // 만트라 완성 진행도 업데이트
   const activeCount = updateCompletionProgress();
@@ -650,6 +582,9 @@ function draw() {
 
   // 오디오 레이어 업데이트
   updateAudioLayers(activeCount);
+
+  // 화면 하단 장식 심볼 (mandala1.png)
+  displayBottomSymbol();
 }
 
 // ============================================
@@ -687,9 +622,9 @@ function displayConnectionInfo(activeCount = 0) {
     displayText = `하나님의 자녀 ${connectedUsers} 명`;
   }
 
-  fill(255, 255, 255, 200);
+  fill(254, 255, 240, 200);
   textAlign(CENTER, TOP);
-  textSize(28); // 크기 증가 (24 → 28)
+  textSize(20); // 크기 증가 (24 → 28)
   if (titleFont) {
     textFont(titleFont);
   } else {
@@ -709,6 +644,30 @@ function displayConnectionInfo(activeCount = 0) {
 
   textAlign(LEFT, BASELINE); // 기본값으로 복원
   textStyle(NORMAL);
+
+  pop();
+}
+
+// 화면 하단 장식 심볼 표시
+function displayBottomSymbol() {
+  if (!mantraImages[0]) return; // 이미지가 로드되지 않았으면 리턴
+
+  push();
+
+  // 화면 하단 중앙에 배치
+  let baseSize = min(width, height) * 0.125; // 화면 크기의 10%
+
+  // 원본 이미지 비율 유지
+  let imgWidth = baseSize * symbolAspectRatio;
+  let imgHeight = baseSize;
+
+  let symbolX = width / 2;
+  let symbolY = height - imgHeight / 2 - 30; // 하단에서 30px 위
+
+  // 약간의 투명도 적용 (은은하게)
+  imageMode(CENTER);
+  image(mantraImages[0], symbolX, symbolY, imgWidth, imgHeight);
+  noTint();
 
   pop();
 }
@@ -857,7 +816,17 @@ function renderVisualLayers(activeCount = 0) {
 
     // 심볼 개수와 이미지 인덱스 먼저 가져오기
     let symbolCount = mantra.symbolCount || SYMBOLS_PER_MANTRA;
-    let imageIndex = mantra.imageIndex !== undefined ? mantra.imageIndex : 0;
+
+    // 위치에 따라 동적으로 이미지 인덱스 결정 (4→3→2→1)
+    // targetRingIndex: 0=첫번째링, 1=두번째링, 2=세번째링, 3=네번째링...
+    let imageIndex;
+    if (targetRingIndex === 0) {
+      imageIndex = 2; // 첫 번째 링 → 3번 이미지 (세 번째로 진함)
+    } else if (targetRingIndex === 1) {
+      imageIndex = 1; // 두 번째 링 → 2번 이미지 (두 번째로 진함)
+    } else {
+      imageIndex = 0; // 세 번째 링 이후 → 1번 이미지 (가장 연함)
+    }
 
     push();
     translate(width / 2, height / 2);
@@ -992,13 +961,13 @@ function drawMantraSymbol(angle, radius, scale, alpha, imageIndex = null) {
 // 장식 효과 - 영어 단어를 원형으로 배치하며 회전
 function drawDecorativeText(imgWidth, imgHeight, alpha, seedIndex) {
   let words = [
-    "Name",
-    "Kingdom",
-    "Will",
-    "Bread",
-    "Forgiveness",
-    "Temptation",
-    "Deliverance",
+    "NAME",
+    "KINGDOM",
+    "WILL",
+    "BREAD",
+    "FORGIVENESS",
+    "TEMPTATION",
+    "DELIVERANCE",
   ];
   let wordCount = words.length;
 
@@ -1031,7 +1000,7 @@ function drawDecorativeText(imgWidth, imgHeight, alpha, seedIndex) {
     let textRotation = angle + HALF_PI;
     rotate(textRotation);
 
-    let textSizeVal = imgWidth * 0.16; // 이미지 크기의 16% (12%→16% 증가)
+    let textSizeVal = imgWidth * 0.09; // 이미지 크기의 10% (더 작게 조정)
 
     // 만다라 색상 사용 (투명도 높게 - 0.95로 증가)
     let c = color(mandalaColor);
@@ -1120,17 +1089,33 @@ function displayLordsPrayer(activeCount = 0) {
   let globalScale = currentScale;
 
   // 1. 완성된 만트라들의 텍스트 표시 (항상 유지)
-  for (let i = 0; i < completedMantras.length; i++) {
-    let mantra = completedMantras[i];
+  // 위치 기반으로 색상 결정을 위해 정렬
+  let sortedMantras = [...completedMantras].sort(
+    (a, b) => b.birthOrder - a.birthOrder
+  );
+
+  for (let i = 0; i < sortedMantras.length; i++) {
+    let mantra = sortedMantras[i];
+    let targetRingIndex = i; // 정렬된 인덱스 = 목표 링 인덱스
 
     // 만트라에 저장된 텍스트가 있으면 표시
     if (mantra.prayerWords && mantra.prayerWords.length > 0) {
-      let ringIndex = 0;
       let textRadius =
         baseRadius +
         (mantra.animatedRingIndex + 1) * ringSpacing +
         symbolSize * 0.3;
-      let textColor = color(MANDALA_COLORS[mantra.imageIndex]);
+
+      // 위치에 따라 동적으로 색상 결정 (4→3→2→1)
+      let imageIndex;
+      if (targetRingIndex === 0) {
+        imageIndex = 2; // 첫 번째 링 → 3번 색상
+      } else if (targetRingIndex === 1) {
+        imageIndex = 1; // 두 번째 링 → 2번 색상
+      } else {
+        imageIndex = 0; // 세 번째 링 이후 → 1번 색상
+      }
+
+      let textColor = color(MANDALA_COLORS[imageIndex]);
 
       // 페이드아웃 처리
       let mantraAlpha = 255;
@@ -1193,11 +1178,9 @@ function displayLordsPrayer(activeCount = 0) {
   }
 }
 
-// 원형 텍스트 그리기 헬퍼 함수
+// 원형 텍스트 그리기 헬퍼 함수 (단어 폭 기반 균등 배치)
 function drawCircularText(words, radius, textColor, alpha) {
-  let totalWords = words.length;
-  let angleStep = TWO_PI / totalWords;
-  let startAngle = -HALF_PI;
+  if (words.length === 0) return;
 
   textAlign(CENTER, CENTER);
   textSize(84); // 크기 증가 (72 → 84)
@@ -1208,20 +1191,41 @@ function drawCircularText(words, radius, textColor, alpha) {
   }
   textStyle(BOLD); // 굵게 설정
 
-  for (let i = 0; i < totalWords; i++) {
+  // 1단계: 각 단어의 폭 측정 및 총 폭 계산
+  let wordWidths = [];
+  let totalWidth = 0;
+  for (let i = 0; i < words.length; i++) {
+    let w = textWidth(words[i]);
+    wordWidths.push(w);
+    totalWidth += w;
+  }
+
+  // 2단계: 단어 간 최소 간격 추가 (각 단어 사이에 평균 폭의 30% 간격)
+  let avgWidth = totalWidth / words.length;
+  let spacingWidth = avgWidth * 0.3; // 간격을 평균 폭의 30%로 설정
+  let totalWidthWithSpacing = totalWidth + spacingWidth * words.length;
+
+  // 3단계: 각 단어에 비례적으로 각도 할당
+  let currentAngle = -HALF_PI; // 12시 방향부터 시작
+
+  for (let i = 0; i < words.length; i++) {
     push();
 
-    let angle = startAngle + i * angleStep;
-    let x = width / 2 + cos(angle) * radius;
-    let y = height / 2 + sin(angle) * radius;
+    // 현재 단어의 중심 각도 계산 (폭의 절반만큼 이동)
+    let wordProportion = (wordWidths[i] + spacingWidth) / totalWidthWithSpacing;
+    let wordAngle = TWO_PI * wordProportion;
+    let centerAngle = currentAngle + wordAngle / 2;
+
+    let x = width / 2 + cos(centerAngle) * radius;
+    let y = height / 2 + sin(centerAngle) * radius;
 
     translate(x, y);
 
     // 텍스트가 원을 따라 회전
-    if (angle > HALF_PI && angle < PI + HALF_PI) {
-      rotate(angle + HALF_PI + PI);
+    if (centerAngle > HALF_PI && centerAngle < PI + HALF_PI) {
+      rotate(centerAngle + HALF_PI + PI);
     } else {
-      rotate(angle + HALF_PI);
+      rotate(centerAngle + HALF_PI);
     }
 
     // 텍스트 색상 - 만다라 색상과 동일하게
@@ -1231,6 +1235,9 @@ function drawCircularText(words, radius, textColor, alpha) {
     text(words[i], 0, 0);
 
     pop();
+
+    // 다음 단어를 위해 각도 이동
+    currentAngle += wordAngle;
   }
 }
 
@@ -1338,17 +1345,7 @@ function updateCompletionProgress() {
       currentProgress = 0;
 
       // 만트라 완성! (현재 접속자 수만큼 심볼 생성)
-      // 완성된 만다라 색상 결정: 4→3→2→1→1→1... (가운데가 진하고 바깥으로 갈수록 연함)
-      let completedImageIndex;
-      if (totalMantraCount === 0) {
-        completedImageIndex = 2; // 첫 번째 완성 → 3번 이미지 (세 번째 진함)
-      } else if (totalMantraCount === 1) {
-        completedImageIndex = 1; // 두 번째 완성 → 2번 이미지 (두 번째 진함)
-      } else if (totalMantraCount === 2) {
-        completedImageIndex = 0; // 세 번째 완성 → 1번 이미지 (가장 연함)
-      } else {
-        completedImageIndex = 0; // 네 번째 이후 → 계속 1번 이미지 (가장 연함)
-      }
+      // 이미지는 위치에 따라 동적으로 결정되므로 여기서는 저장하지 않음
 
       // 완성된 텍스트 저장 (전체 주기도문)
       let completedWords = [];
@@ -1365,7 +1362,7 @@ function updateCompletionProgress() {
         targetScale: 1.0, // 목표 스케일
         currentScale: 0.3, // 생성 시 작은 크기에서 시작 (30%)
         symbolCount: activeCount, // 완성 당시의 접속자 수 저장
-        imageIndex: completedImageIndex, // 3번 이미지 인덱스 저장
+        // imageIndex는 위치에 따라 동적으로 결정됨
         animatedRingIndex: 0, // 가장 안쪽에서 시작 (중앙에서 완성됨)
         birthOrder: totalMantraCount, // 생성 순서 (정렬용)
         isNewlyCreated: true, // 새로 생성된 만다라 표시
@@ -1374,11 +1371,7 @@ function updateCompletionProgress() {
 
       totalMantraCount++; // 전체 생성 횟수 증가
 
-      console.log(
-        `✨ 만트라 완성! #${totalMantraCount} - 만다라 이미지 ${
-          completedImageIndex + 1
-        } 사용`
-      );
+      console.log(`✨ 만트라 완성! #${totalMantraCount}`);
 
       // 최대 개수 제한 (오래된 것부터 제거)
       if (completedMantras.length > MAX_MANTRAS) {
