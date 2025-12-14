@@ -889,9 +889,8 @@ function drawDecorativeText(imgWidth, imgHeight, alpha, seedIndex) {
     let textRotation = angle + HALF_PI;
     rotate(textRotation);
 
-    let textSizeVal = imgWidth * 0.09; // 이미지 크기의 10% (더 작게 조정)
+    let textSizeVal = imgWidth * 0.09;
 
-    // 만다라 색상 사용 (투명도 높게 - 0.95로 증가)
     let c = color(mandalaColor);
     fill(red(c), green(c), blue(c), alpha * 0.95);
     noStroke();
@@ -904,32 +903,27 @@ function drawDecorativeText(imgWidth, imgHeight, alpha, seedIndex) {
 }
 
 function displayCompletionState(activeCount = 0) {
-  // 2명 이상일 때 진행도 표시 (주술적인 원형 디자인)
   if (activeCount >= 2 && currentProgress > 0) {
     push();
     translate(width / 2, height / 2);
 
-    // 진행 중인 만다라는 항상 4번 색상
-    let progressImageIndex = 3; // 4번 이미지 색상
+    let progressImageIndex = 3;
     let progressColor = color(MANDALA_COLORS[progressImageIndex]);
 
-    // 외곽 원 (고정) - 매우 얇고 은은하게
     noFill();
     stroke(red(progressColor), green(progressColor), blue(progressColor), 80);
     strokeWeight(1);
     let outerRadius = 35;
     ellipse(0, 0, outerRadius * 2, outerRadius * 2);
 
-    // 진행도 원호 (시계방향으로 채워짐)
     stroke(red(progressColor), green(progressColor), blue(progressColor), 200);
     strokeWeight(2.5);
     noFill();
-    let startAngle = -HALF_PI; // 12시 방향부터 시작
+    let startAngle = -HALF_PI;
     let endAngle = startAngle + TWO_PI * currentProgress;
     arc(0, 0, outerRadius * 2, outerRadius * 2, startAngle, endAngle);
 
-    // 내부 펄스 원 (맥박처럼 뛰는 효과)
-    let pulseAmount = sin(frameCount * 0.1) * 0.15 + 0.85; // 0.7 ~ 1.0
+    let pulseAmount = sin(frameCount * 0.1) * 0.15 + 0.85;
     let innerRadius = 20 * pulseAmount;
     fill(
       red(progressColor),
@@ -940,7 +934,6 @@ function displayCompletionState(activeCount = 0) {
     noStroke();
     ellipse(0, 0, innerRadius * 2, innerRadius * 2);
 
-    // 중앙 발광 점
     fill(
       red(progressColor),
       green(progressColor),
@@ -949,14 +942,12 @@ function displayCompletionState(activeCount = 0) {
     );
     ellipse(0, 0, 8, 8);
 
-    // 회전하는 7개의 점들 (7명이 함께 기도하는 의미)
     let dotCount = 7;
     for (let i = 0; i < dotCount; i++) {
-      let angle = (i * TWO_PI) / dotCount + frameCount * 0.02 - HALF_PI; // -90도부터 시작 (위쪽)
+      let angle = (i * TWO_PI) / dotCount + frameCount * 0.02 - HALF_PI;
       let dotX = cos(angle) * (outerRadius + 8);
       let dotY = sin(angle) * (outerRadius + 8);
 
-      // 진행도에 따라 점이 나타남
       let dotProgress = currentProgress * dotCount - i;
       dotProgress = constrain(dotProgress, 0, 1);
 
@@ -966,47 +957,43 @@ function displayCompletionState(activeCount = 0) {
         blue(progressColor),
         200 * dotProgress
       );
-      ellipse(dotX, dotY, 5, 5); // 크기 4 → 5로 증가
+      ellipse(dotX, dotY, 5, 5);
     }
 
     pop();
   }
 }
 
-// 주기도문 표시 (원형으로 만다라 주변에 배치)
 function displayLordsPrayer(activeCount = 0) {
   let globalScale = currentScale;
 
-  // 1. 완성된 만트라들의 텍스트 표시 (항상 유지)
-  // 위치 기반으로 색상 결정을 위해 정렬
   let sortedMantras = [...completedMantras].sort(
     (a, b) => b.birthOrder - a.birthOrder
   );
 
   for (let i = 0; i < sortedMantras.length; i++) {
     let mantra = sortedMantras[i];
-    let targetRingIndex = i; // 정렬된 인덱스 = 목표 링 인덱스
+    let targetRingIndex = i;
 
-    // 만트라에 저장된 텍스트가 있으면 표시
     if (mantra.prayerWords && mantra.prayerWords.length > 0) {
       let textRadius =
         baseRadius +
         (mantra.animatedRingIndex + 1) * ringSpacing +
         symbolSize * 0.3;
 
-      // 위치에 따라 동적으로 색상 결정 (4→3→2→1)
+      // color selection (ring index)
       let imageIndex;
       if (targetRingIndex === 0) {
-        imageIndex = 2; // 첫 번째 링 → 3번 색상
+        imageIndex = 2;
       } else if (targetRingIndex === 1) {
-        imageIndex = 1; // 두 번째 링 → 2번 색상
+        imageIndex = 1;
       } else {
-        imageIndex = 0; // 세 번째 링 이후 → 1번 색상
+        imageIndex = 0;
       }
 
       let textColor = color(MANDALA_COLORS[imageIndex]);
 
-      // 페이드아웃 처리
+      // fade out
       let mantraAlpha = 255;
       let age = millis() - mantra.createdTime;
       if (age > MANTRA_LIFETIME) {
@@ -1032,14 +1019,12 @@ function displayLordsPrayer(activeCount = 0) {
     }
   }
 
-  // 2. 진행 중인 만트라 텍스트 표시 (점진적으로 나타남)
   if (activeCount >= 2 && currentProgress > 0) {
-    // 텍스트는 linear하게 등장
+    // linear text
     let elapsedTime = millis() - touchStartTime;
     let linearProgress = constrain(elapsedTime / COMPLETION_TIME, 0, 1);
     let wordCount = floor(linearProgress * LORDS_PRAYER.length);
 
-    // 빈 문자열 제외한 실제 단어들만 필터링
     let wordsToShow = [];
     for (let i = 0; i < wordCount && i < LORDS_PRAYER.length; i++) {
       if (LORDS_PRAYER[i] !== "") {
@@ -1050,7 +1035,6 @@ function displayLordsPrayer(activeCount = 0) {
     if (wordsToShow.length > 0) {
       let ringIndex = 0;
       let textRadius = baseRadius + ringIndex * ringSpacing + symbolSize * 0.3;
-      // 진행 중인 만다라는 항상 4번 색상
       let progressImageIndex = 3;
       let textColor = color(MANDALA_COLORS[progressImageIndex]);
 
@@ -1067,20 +1051,18 @@ function displayLordsPrayer(activeCount = 0) {
   }
 }
 
-// 원형 텍스트 그리기 헬퍼 함수 (단어 폭 기반 균등 배치)
 function drawCircularText(words, radius, textColor, alpha) {
   if (words.length === 0) return;
 
   textAlign(CENTER, CENTER);
-  textSize(84); // 크기 증가 (72 → 84)
+  textSize(84);
   if (prayerFont) {
     textFont(prayerFont);
   } else {
     textFont("serif");
   }
-  textStyle(BOLD); // 굵게 설정
+  textStyle(BOLD);
 
-  // 1단계: 각 단어의 폭 측정 및 총 폭 계산
   let wordWidths = [];
   let totalWidth = 0;
   for (let i = 0; i < words.length; i++) {
@@ -1089,18 +1071,15 @@ function drawCircularText(words, radius, textColor, alpha) {
     totalWidth += w;
   }
 
-  // 2단계: 단어 간 최소 간격 추가 (각 단어 사이에 평균 폭의 30% 간격)
   let avgWidth = totalWidth / words.length;
-  let spacingWidth = avgWidth * 0.3; // 간격을 평균 폭의 30%로 설정
+  let spacingWidth = avgWidth * 0.3;
   let totalWidthWithSpacing = totalWidth + spacingWidth * words.length;
 
-  // 3단계: 각 단어에 비례적으로 각도 할당
-  let currentAngle = -HALF_PI; // 12시 방향부터 시작
+  let currentAngle = -HALF_PI;
 
   for (let i = 0; i < words.length; i++) {
     push();
 
-    // 현재 단어의 중심 각도 계산 (폭의 절반만큼 이동)
     let wordProportion = (wordWidths[i] + spacingWidth) / totalWidthWithSpacing;
     let wordAngle = TWO_PI * wordProportion;
     let centerAngle = currentAngle + wordAngle / 2;
@@ -1110,14 +1089,12 @@ function drawCircularText(words, radius, textColor, alpha) {
 
     translate(x, y);
 
-    // 텍스트가 원을 따라 회전
     if (centerAngle > HALF_PI && centerAngle < PI + HALF_PI) {
       rotate(centerAngle + HALF_PI + PI);
     } else {
       rotate(centerAngle + HALF_PI);
     }
 
-    // 텍스트 색상 - 만다라 색상과 동일하게
     fill(red(textColor), green(textColor), blue(textColor), alpha);
     noStroke();
 
@@ -1125,13 +1102,12 @@ function drawCircularText(words, radius, textColor, alpha) {
 
     pop();
 
-    // 다음 단어를 위해 각도 이동
     currentAngle += wordAngle;
   }
 }
 
 // ============================================
-// 11. 유틸리티 함수
+// Utility Functions
 // ============================================
 
 function countActiveTouches() {
@@ -1150,29 +1126,22 @@ function refreshConnectionCount() {
   }
 }
 
-// 오래된 만트라 제거 및 페이드아웃 처리
 function updateMantraLifetime() {
-  // 생존 시간이 지난 만트라들을 필터링하여 제거
   let currentTime = millis();
 
   completedMantras = completedMantras.filter((mantra) => {
     let age = currentTime - mantra.createdTime;
-    // 생존 시간 + 페이드아웃 시간이 지나면 제거
     return age < MANTRA_LIFETIME + MANTRA_FADEOUT_TIME;
   });
 }
 
-// 만트라 완성 진행도 업데이트
 function updateCompletionProgress() {
   let activeCount = countActiveTouches();
 
-  // 사람 수가 변경되었는지 체크
   if (activeCount !== lastActiveCount && activeCount >= 2) {
-    // 사람 수가 변경되면 진행도 초기화 (2명 이상일 때만)
     touchStartTime = millis();
     currentProgress = 0;
 
-    // 기도 오디오 재시작
     if (prayerSound) {
       if (prayerSound.isPlaying()) {
         prayerSound.stop();
@@ -1181,49 +1150,41 @@ function updateCompletionProgress() {
     }
   }
 
-  // 2명 이상이 터치하고 있으면 진행도 시작
   if (activeCount >= 2) {
-    // 처음 터치 시작 (완성된 적이 없을 때만)
     if (touchStartTime === 0 && !hasCompletedCurrentMantra) {
       touchStartTime = millis();
 
-      // 기도 오디오 재생 시작
       if (prayerSound && !prayerSound.isPlaying()) {
         prayerSound.play();
       }
     }
 
-    // 진행도 계산 (터치 시작된 경우에만)
     if (touchStartTime > 0) {
       let elapsedTime = millis() - touchStartTime;
       let linearProgress = constrain(elapsedTime / COMPLETION_TIME, 0, 1);
 
-      // ease-in-out cubic (더 드라마틱한 가속/감속)
+      // ease-in-out cubic
       currentProgress =
         linearProgress < 0.5
           ? 4 * linearProgress * linearProgress * linearProgress
           : 1 - pow(-2 * linearProgress + 2, 3) / 2;
     }
 
-    // 완성 체크 (27초 경과) - 아직 완성하지 않았을 때만
     if (
       touchStartTime > 0 &&
       currentProgress >= 1 &&
       !hasCompletedCurrentMantra
     ) {
-      // ===== 플래시 효과 시작 =====
+      // ===== flash =====
       completionFlash.active = true;
       completionFlash.startTime = millis();
 
-      // 만트라 완성 플래그 설정 및 진행 초기화
       hasCompletedCurrentMantra = true;
-      touchStartTime = 0; // 새로운 터치 세션 필요
+      touchStartTime = 0;
       currentProgress = 0;
 
-      // 만트라 완성! (현재 접속자 수만큼 심볼 생성)
-      // 이미지는 위치에 따라 동적으로 결정되므로 여기서는 저장하지 않음
+      // mandala 완성
 
-      // 완성된 텍스트 저장 (전체 주기도문)
       let completedWords = [];
       for (let i = 0; i < LORDS_PRAYER.length; i++) {
         if (LORDS_PRAYER[i] !== "") {
@@ -1233,79 +1194,65 @@ function updateCompletionProgress() {
 
       completedMantras.push({
         rotation: currentMantraRotation,
-        createdTime: millis(), // 생성 시간 기록
-        ringIndex: completedMantras.length, // 고정된 링 인덱스 저장
-        targetScale: 1.0, // 목표 스케일
-        currentScale: 0.3, // 생성 시 작은 크기에서 시작 (30%)
-        symbolCount: activeCount, // 완성 당시의 접속자 수 저장
-        // imageIndex는 위치에 따라 동적으로 결정됨
-        animatedRingIndex: 0, // 가장 안쪽에서 시작 (중앙에서 완성됨)
-        birthOrder: totalMantraCount, // 생성 순서 (정렬용)
-        isNewlyCreated: true, // 새로 생성된 만다라 표시
-        prayerWords: completedWords, // 완성된 주기도문 텍스트 저장
+        createdTime: millis(),
+        ringIndex: completedMantras.length,
+        targetScale: 1.0,
+        currentScale: 0.3,
+        symbolCount: activeCount,
+        animatedRingIndex: 0,
+        birthOrder: totalMantraCount,
+        isNewlyCreated: true,
+        prayerWords: completedWords,
       });
 
-      totalMantraCount++; // 전체 생성 횟수 증가
+      totalMantraCount++;
 
-      // 최대 개수 제한 (오래된 것부터 제거)
       if (completedMantras.length > MAX_MANTRAS) {
-        completedMantras.shift(); // 가장 오래된 만트라 제거
+        completedMantras.shift();
       }
-
-      // 회전은 연속적으로 유지 (초기화 안 함)
     }
 
-    // 현재 진행 중인 만트라 회전
-    currentMantraRotation += ROTATION_SPEED * 0.5; // 완성 전에는 천천히 회전
+    currentMantraRotation += ROTATION_SPEED * 0.5;
   } else if (activeCount === 1) {
-    // 1명일 때는 진행도는 안 올라가지만 회전은 함
-    currentMantraRotation += ROTATION_SPEED * 0.3; // 더 천천히 회전
+    currentMantraRotation += ROTATION_SPEED * 0.15;
     touchStartTime = 0;
     currentProgress = 0;
-    hasCompletedCurrentMantra = false; // 완성 플래그 초기화
+    hasCompletedCurrentMantra = false;
 
-    // 기도 오디오 정지
     if (prayerSound && prayerSound.isPlaying()) {
       prayerSound.stop();
     }
   } else {
-    // 아무도 없으면 진행도만 초기화 (회전은 부드럽게 감속)
     touchStartTime = 0;
     currentProgress = 0;
-    hasCompletedCurrentMantra = false; // 완성 플래그 초기화
-    // 회전 속도를 점진적으로 줄임
+    hasCompletedCurrentMantra = false;
     currentMantraRotation += ROTATION_SPEED * 0.1;
 
-    // 기도 오디오 정지
     if (prayerSound && prayerSound.isPlaying()) {
       prayerSound.stop();
     }
   }
 
-  // 현재 활성 사용자 수 저장
   lastActiveCount = activeCount;
   return activeCount;
 }
 
-// 반응형 크기 계산
+// responsive size calculation(반응형 디바이스)
 function calculateResponsiveSizes() {
-  // 화면 대각선 길이 계산
   let diagonal = sqrt(width * width + height * height);
 
-  // 화면 크기에 비례하여 크기 계산
   baseRadius = diagonal * BASE_RADIUS_RATIO;
   ringSpacing = diagonal * RING_SPACING_RATIO;
   symbolSize = diagonal * SYMBOL_SIZE_RATIO;
 }
 
-// 윈도우 크기 변경 대응
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   calculateResponsiveSizes();
 }
 
 // ============================================
-// 12. 테스트 모드 함수들
+// Test Mode
 // ============================================
 
 // 가상 사용자 생성
@@ -1315,10 +1262,10 @@ function createVirtualUser() {
 
   virtualUsers.push(virtualUserId);
 
-  // activeTouches에 추가
+  // activeTouches
   activeTouches[virtualUserId] = {
     active: true,
-    x: random(0.3, 0.7), // 랜덤 위치
+    x: random(0.3, 0.7),
     y: random(0.3, 0.7),
     visualLayer: null,
   };
@@ -1326,7 +1273,6 @@ function createVirtualUser() {
   refreshConnectionCount();
 }
 
-// 가상 사용자 제거
 function removeVirtualUser() {
   if (virtualUsers.length > 0) {
     let removedUserId = virtualUsers.pop();
@@ -1335,7 +1281,6 @@ function removeVirtualUser() {
   }
 }
 
-// 모든 가상 사용자 제거
 function removeAllVirtualUsers() {
   virtualUsers.forEach((uid) => {
     delete activeTouches[uid];
@@ -1345,40 +1290,32 @@ function removeAllVirtualUsers() {
   refreshConnectionCount();
 }
 
-// 특정 개수의 가상 사용자 설정
 function setVirtualUserCount(count) {
-  // 기존 가상 사용자 모두 제거
   removeAllVirtualUsers();
 
-  // 새로운 가상 사용자 생성
   for (let i = 0; i < count; i++) {
     createVirtualUser();
   }
 }
 
-// 키보드 입력 처리
 function keyPressed() {
   if (testMode) {
-    // 숫자 키 1-9: 해당 개수만큼 가상 사용자 생성
     if (key >= "1" && key <= "9") {
       let count = parseInt(key);
       setVirtualUserCount(count);
       return false;
     }
 
-    // 0: 모든 가상 사용자 제거
     if (key === "0") {
       removeAllVirtualUsers();
       return false;
     }
 
-    // +: 사용자 1명 추가
     if (key === "+" || key === "=") {
       createVirtualUser();
       return false;
     }
 
-    // -: 사용자 1명 제거
     if (key === "-" || key === "_") {
       removeVirtualUser();
       return false;
