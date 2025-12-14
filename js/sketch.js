@@ -58,10 +58,12 @@ let decorFont; // 만다라 주변 장식 텍스트용 폰트 (Tikkeul)
 let mantraImg; // 만트라 심볼 이미지 (레거시, 사용 안 함)
 let mantraImages = []; // 6개의 만다라 이미지 배열
 
-// 만다라 색상 코드 (2개만 번갈아 사용)
+// 만다라 색상 코드 (4개)
 const MANDALA_COLORS = [
-  "#fefff0", // 만다라 1 (밝은 크림색)
-  "#ffec7b", // 만다라 2 (밝은 노란색)
+  "#fefff0", // 만다라 1
+  "#fffae3", // 만다라 2
+  "#fff1ae", // 만다라 3
+  "#ffec7b", // 만다라 4
 ];
 
 // 텍스트 만다라용 패턴 정의 - 원형 패턴만 사용
@@ -142,7 +144,7 @@ let targetScale = 1.0; // 목표 스케일 값
 const SCALE_LERP_AMOUNT = 0.03; // 스케일 보간 속도 (0~1, 작을수록 부드럽게) - 더 부드럽게 (0.05 → 0.03)
 
 // 만다라 이미지 개수
-const MANTRA_IMAGE_COUNT = 2;
+const MANTRA_IMAGE_COUNT = 4;
 
 // 주기도문 텍스트 (단어별로 분리)
 const LORDS_PRAYER = [
@@ -206,8 +208,8 @@ const LORDS_PRAYER = [
 // ============================================
 
 function preload() {
-  // 2개의 만다라 PNG 이미지 로드
-  for (let i = 0; i < 2; i++) {
+  // 4개의 만다라 PNG 이미지 로드
+  for (let i = 0; i < 4; i++) {
     const imageNumber = i + 1;
     const index = i;
 
@@ -905,8 +907,8 @@ function renderVisualLayers(activeCount = 0) {
       0.2
     );
 
-    // 다음에 완성될 만다라 이미지 인덱스 미리 계산
-    let nextImageIndex = totalMantraCount % MANTRA_IMAGE_COUNT;
+    // 진행 중인 만다라는 항상 4번 이미지(인덱스 3) 사용
+    let progressImageIndex = 3; // 4번 이미지
 
     push();
     translate(width / 2, height / 2);
@@ -917,8 +919,8 @@ function renderVisualLayers(activeCount = 0) {
     push();
     translate(width / 2, height / 2);
     noFill();
-    // 진행 중인 만트라는 다음에 완성될 만다라 색상 사용
-    let progressRingColor = color(MANDALA_COLORS[nextImageIndex]);
+    // 진행 중인 만트라는 4번 이미지 색상 사용
+    let progressRingColor = color(MANDALA_COLORS[progressImageIndex]);
     stroke(
       red(progressRingColor),
       green(progressRingColor),
@@ -934,7 +936,7 @@ function renderVisualLayers(activeCount = 0) {
     for (let i = 0; i < activeCount; i++) {
       let angle = (i * TWO_PI) / activeCount - HALF_PI;
       let alpha = 255;
-      drawMantraSymbol(angle, radius, 1.0, alpha, nextImageIndex);
+      drawMantraSymbol(angle, radius, 1.0, alpha, progressImageIndex);
     }
 
     pop();
@@ -1049,9 +1051,9 @@ function displayCompletionState(activeCount = 0) {
     push();
     translate(width / 2, height / 2);
 
-    // 다음 만다라 색상
-    let nextImageIndex = totalMantraCount % MANTRA_IMAGE_COUNT;
-    let progressColor = color(MANDALA_COLORS[nextImageIndex]);
+    // 진행 중인 만다라는 항상 4번 색상
+    let progressImageIndex = 3; // 4번 이미지 색상
+    let progressColor = color(MANDALA_COLORS[progressImageIndex]);
 
     // 외곽 원 (고정) - 매우 얇고 은은하게
     noFill();
@@ -1174,8 +1176,9 @@ function displayLordsPrayer(activeCount = 0) {
     if (wordsToShow.length > 0) {
       let ringIndex = 0;
       let textRadius = baseRadius + ringIndex * ringSpacing + symbolSize * 0.3;
-      let imageIndex = totalMantraCount % MANTRA_IMAGE_COUNT;
-      let textColor = color(MANDALA_COLORS[imageIndex]);
+      // 진행 중인 만다라는 항상 4번 색상
+      let progressImageIndex = 3;
+      let textColor = color(MANDALA_COLORS[progressImageIndex]);
 
       push();
       translate(width / 2, height / 2);
@@ -1335,8 +1338,17 @@ function updateCompletionProgress() {
       currentProgress = 0;
 
       // 만트라 완성! (현재 접속자 수만큼 심볼 생성)
-      // 전체 생성 횟수 기반으로 색상 인덱스 계산 (오래된 만트라 제거되어도 순서 유지)
-      let imageIndex = totalMantraCount % MANTRA_IMAGE_COUNT; // 이미지 순환 (0-5)
+      // 완성된 만다라 색상 결정: 4→3→2→1→1→1... (가운데가 진하고 바깥으로 갈수록 연함)
+      let completedImageIndex;
+      if (totalMantraCount === 0) {
+        completedImageIndex = 2; // 첫 번째 완성 → 3번 이미지 (세 번째 진함)
+      } else if (totalMantraCount === 1) {
+        completedImageIndex = 1; // 두 번째 완성 → 2번 이미지 (두 번째 진함)
+      } else if (totalMantraCount === 2) {
+        completedImageIndex = 0; // 세 번째 완성 → 1번 이미지 (가장 연함)
+      } else {
+        completedImageIndex = 0; // 네 번째 이후 → 계속 1번 이미지 (가장 연함)
+      }
 
       // 완성된 텍스트 저장 (전체 주기도문)
       let completedWords = [];
@@ -1353,7 +1365,7 @@ function updateCompletionProgress() {
         targetScale: 1.0, // 목표 스케일
         currentScale: 0.3, // 생성 시 작은 크기에서 시작 (30%)
         symbolCount: activeCount, // 완성 당시의 접속자 수 저장
-        imageIndex: imageIndex, // 이미지 인덱스 저장 (0-5)
+        imageIndex: completedImageIndex, // 3번 이미지 인덱스 저장
         animatedRingIndex: 0, // 가장 안쪽에서 시작 (중앙에서 완성됨)
         birthOrder: totalMantraCount, // 생성 순서 (정렬용)
         isNewlyCreated: true, // 새로 생성된 만다라 표시
@@ -1364,7 +1376,7 @@ function updateCompletionProgress() {
 
       console.log(
         `✨ 만트라 완성! #${totalMantraCount} - 만다라 이미지 ${
-          imageIndex + 1
+          completedImageIndex + 1
         } 사용`
       );
 
