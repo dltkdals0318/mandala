@@ -183,7 +183,7 @@ function preload() {
 }
 
 // ============================================
-// 4. p5.js 셋업
+// p5.js setup
 // ============================================
 
 function setup() {
@@ -209,26 +209,22 @@ function setup() {
 }
 
 // ============================================
-// 5. Firebase 초기화 및 실시간 동기화
+// 5. Firebase reset
 // ============================================
 
 function initFirebase() {
-  // Firebase 앱 초기화
   firebase.initializeApp(firebaseConfig);
   database = firebase.database();
 
-  // 고유 사용자 ID 생성 (timestamp + 랜덤값)
   userId = Date.now() + "_" + Math.floor(Math.random() * 10000);
 
-  // Firebase 참조 설정
   usersRef = database.ref("users");
   myConnectionRef = usersRef.child(userId);
 
-  // Firebase 연결 상태 모니터링
   const connectedRef = database.ref(".info/connected");
   connectedRef.on("value", (snapshot) => {
     if (snapshot.val() === true) {
-      // 연결됨 - 사용자 데이터 설정
+      // user data
       myConnectionRef.set({
         online: true,
         touchActive: false,
@@ -238,15 +234,13 @@ function initFirebase() {
         lastSeen: firebase.database.ServerValue.TIMESTAMP,
       });
 
-      // 연결 끊길 때 자동 제거
+      // auto remove on disconnect
       myConnectionRef.onDisconnect().remove();
 
-      // 기존 heartbeat 인터벌 제거 (중복 방지)
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
       }
 
-      // lastSeen 업데이트 (10초마다)
       heartbeatInterval = setInterval(() => {
         if (myConnectionRef) {
           myConnectionRef.update({
@@ -262,15 +256,13 @@ function initFirebase() {
     }
   });
 
-  // 실시간 접속자 추적 시작
   setupPresenceTracking();
 
-  // 초기 정리 (페이지 로드 시 한번 실행)
   setTimeout(() => {
     usersRef.once("value", (snapshot) => {
       cleanupStaleConnections(snapshot);
     });
-  }, 2000); // 2초 후 실행
+  }, 2000);
 }
 
 function initTestMode() {
@@ -286,38 +278,33 @@ function initTestMode() {
 }
 
 // ============================================
-// 6. 실시간 접속자 추적 (Presence System)
+// Presence System
 // ============================================
 
 function setupPresenceTracking() {
-  // 전체 사용자 목록 변경 감지
   usersRef.on("value", (snapshot) => {
     connectedUsers = snapshot.numChildren();
 
-    // 오래된 연결 정리 (60초 이상 lastSeen 업데이트 없음)
     cleanupStaleConnections(snapshot);
   });
 
-  // 새로운 사용자 접속
   usersRef.on("child_added", (snapshot) => {
     const user = snapshot.val();
     const uid = snapshot.key;
 
-    // 로컬 활성 터치 데이터에 추가
     activeTouches[uid] = {
       active: user.touchActive || false,
       x: user.touchX || 0.5,
       y: user.touchY || 0.5,
-      visualLayer: null, // 나중에 비주얼 객체 저장
+      visualLayer: null,
     };
   });
 
-  // 기존 사용자 데이터 변경
   usersRef.on("child_changed", (snapshot) => {
     const user = snapshot.val();
     const uid = snapshot.key;
 
-    // 로컬 데이터 업데이트
+    // local data update
     if (activeTouches[uid]) {
       activeTouches[uid].active = user.touchActive;
       activeTouches[uid].x = user.touchX;
@@ -325,25 +312,21 @@ function setupPresenceTracking() {
     }
   });
 
-  // 사용자 연결 해제
   usersRef.on("child_removed", (snapshot) => {
     const uid = snapshot.key;
 
-    // 로컬 데이터에서 삭제
     delete activeTouches[uid];
   });
 }
 
-// 오래된 연결 정리 함수
 function cleanupStaleConnections(snapshot) {
   const now = Date.now();
-  const TIMEOUT = 30000; // 30초 (heartbeat가 10초이므로 3번 놓치면 제거)
+  const TIMEOUT = 30000;
 
   snapshot.forEach((childSnapshot) => {
     const uid = childSnapshot.key;
     const user = childSnapshot.val();
 
-    // lastSeen이 없는 오래된 데이터는 무조건 제거
     if (!user.lastSeen) {
       usersRef.child(uid).remove();
       return;
@@ -352,7 +335,6 @@ function cleanupStaleConnections(snapshot) {
     const lastSeen = user.lastSeen;
     const timeSinceLastSeen = now - lastSeen;
 
-    // 30초 이상 업데이트 없으면 제거
     if (timeSinceLastSeen > TIMEOUT) {
       usersRef.child(uid).remove();
     }
@@ -360,11 +342,10 @@ function cleanupStaleConnections(snapshot) {
 }
 
 // ============================================
-// 7. 오디오 초기화 및 관리
+// audio presetup
 // ============================================
 
 function initAudio() {
-  // 오디오 레이어를 루프로 설정하되, 처음엔 볼륨 0
   audioLayers.forEach((layer) => {
     if (layer) {
       layer.loop();
@@ -377,33 +358,29 @@ function updateAudioLayers(activeCount = 0) {
   let layerIndex = 0;
 
   if (activeCount > 0) {
-    // 활성 사용자 순서대로 필요한 레이어만 켬
     for (let uid in activeTouches) {
       if (activeTouches[uid].active && layerIndex < MAX_LAYERS) {
         if (audioLayers[layerIndex]) {
-          audioLayers[layerIndex].setVolume(1, 0.5); // 0.5초 페이드인
+          audioLayers[layerIndex].setVolume(1, 0.5);
         }
         layerIndex++;
       }
     }
   }
 
-  // 나머지 레이어는 항상 페이드아웃
   for (let i = layerIndex; i < MAX_LAYERS; i++) {
     if (audioLayers[i]) {
-      audioLayers[i].setVolume(0, 0.5); // 0.5초 페이드아웃
+      audioLayers[i].setVolume(0, 0.5);
     }
   }
 }
 
 // ============================================
-// 8. 터치/마우스 이벤트 처리
+// Touch / Mouse Event Handlers
 // ============================================
 
 function touchStarted() {
-  // 캔버스 영역 내에서만 동작
   if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
-    // 오디오 컨텍스트 활성화 (브라우저 autoplay 정책 대응)
     if (getAudioContext().state !== "running") {
       getAudioContext().resume();
     }
@@ -422,14 +399,12 @@ function touchStarted() {
       updateLocalTouchState(true, normalizedX, normalizedY);
     }
 
-    // 기본 동작 방지 (모바일 스크롤 등)
     return false;
   }
 }
 
 function touchMoved() {
   if (mouseIsPressed) {
-    // 쓰로틀링: 너무 자주 업데이트하지 않기
     let now = millis();
     if (now - lastUpdate > UPDATE_INTERVAL) {
       let normalizedX = mouseX / width;
@@ -453,7 +428,7 @@ function touchMoved() {
 
 function touchEnded() {
   if (myConnectionRef) {
-    // Firebase에 터치 비활성화 상태 업데이트
+    // firebase update
     myConnectionRef.update({
       touchActive: false,
     });
@@ -464,7 +439,7 @@ function touchEnded() {
   return false;
 }
 
-// 마우스 이벤트도 동일하게 처리 (데스크탑 대응)
+// mouse events for desktop testing
 function mousePressed() {
   return touchStarted();
 }
@@ -504,38 +479,31 @@ function updateLocalTouchState(isActive, normalizedX, normalizedY) {
 }
 
 // ============================================
-// 9. 메인 드로우 루프
+// main draw loop
 // ============================================
 
 function draw() {
-  // 배경 (#0d1235)
   background("#111320ff");
 
-  // 만트라 완성 진행도 업데이트
   const activeCount = updateCompletionProgress();
 
-  // 오래된 만트라 제거 및 페이드아웃 처리
   updateMantraLifetime();
 
-  // 접속자 정보 표시
   displayConnectionInfo(activeCount);
 
-  // 모든 활성 터치의 비주얼 레이어 렌더링
   renderVisualLayers(activeCount);
 
-  // 완성 상태 시각화
   displayCompletionState(activeCount);
 
-  // 주기도문 표시 (만다라와 함께)
   displayLordsPrayer(activeCount);
 
-  // ===== 완성 플래시 효과 =====
+  // ===== flash effect =====
   if (completionFlash.active) {
     let elapsed = millis() - completionFlash.startTime;
     let progress = elapsed / completionFlash.duration;
 
     if (progress < 1) {
-      // 플래시 강도를 50%로 줄이고, 더 빠르게 사라지도록
+      // flash alpha (ease-out)
       let flashAlpha = 128 * (1 - pow(progress, 1.5));
 
       push();
@@ -547,15 +515,13 @@ function draw() {
     }
   }
 
-  // 오디오 레이어 업데이트
   updateAudioLayers(activeCount);
 
-  // 화면 하단 장식 심볼 (mandala1.png)
   displayBottomSymbol();
 }
 
 // ============================================
-// 10. UI 렌더링 함수들
+// UI rendering functions
 // ============================================
 
 function displayConnectionInfo(activeCount = 0) {
@@ -565,7 +531,6 @@ function displayConnectionInfo(activeCount = 0) {
 
   push();
 
-  // 한국어로 명 수 표시 - 화면 맨 위 중앙
   let displayText;
   if (connectedUsers === 1) {
     displayText = "하나님의 자녀 한 명";
@@ -591,7 +556,7 @@ function displayConnectionInfo(activeCount = 0) {
 
   fill(254, 255, 240, 200);
   textAlign(CENTER, TOP);
-  textSize(20); // 크기 증가 (24 → 28)
+  textSize(20);
   if (titleFont) {
     textFont(titleFont);
   } else {
@@ -600,7 +565,7 @@ function displayConnectionInfo(activeCount = 0) {
   textStyle(BOLD);
   text(displayText, width / 2, 30);
 
-  // 테스트 모드 안내 (작게, 밝은 회색)
+  // test mode
   if (testMode) {
     textAlign(CENTER, TOP);
     fill(200, 200, 200, 200);
@@ -609,29 +574,26 @@ function displayConnectionInfo(activeCount = 0) {
     text("테스트: 1-9", width / 2, 60);
   }
 
-  textAlign(LEFT, BASELINE); // 기본값으로 복원
+  textAlign(LEFT, BASELINE);
   textStyle(NORMAL);
 
   pop();
 }
 
-// 화면 하단 장식 심볼 표시
+// bottom symbol
 function displayBottomSymbol() {
-  if (!mantraImages[0]) return; // 이미지가 로드되지 않았으면 리턴
+  if (!mantraImages[0]) return;
 
   push();
 
-  // 화면 하단 중앙에 배치
-  let baseSize = min(width, height) * 0.125; // 화면 크기의 10%
+  let baseSize = min(width, height) * 0.125;
 
-  // 원본 이미지 비율 유지
   let imgWidth = baseSize * symbolAspectRatio;
   let imgHeight = baseSize;
 
   let symbolX = width / 2;
-  let symbolY = height - imgHeight / 2 - 30; // 하단에서 30px 위
+  let symbolY = height - imgHeight / 2 - 30;
 
-  // 약간의 투명도 적용 (은은하게)
   imageMode(CENTER);
   image(mantraImages[0], symbolX, symbolY, imgWidth, imgHeight);
   noTint();
@@ -640,14 +602,11 @@ function displayBottomSymbol() {
 }
 
 // ============================================
-// 10. 비주얼 렌더링 함수들
+// Visual Layer Rendering
 // ============================================
 
 function calculateGlobalScale(activeCount = 0) {
-  // 스케일 고정: 항상 2개 만다라 기준으로 계산 (최적의 화면 비율)
-  // 진행 중인 만트라 1개 + 완성된 만트라 1개 = 총 2개 기준
-
-  let fixedMantraCount = 2; // 2개 만다라 기준으로 고정
+  let fixedMantraCount = 2;
   let maxRadius = baseRadius + fixedMantraCount * ringSpacing;
 
   let requiredSpace = maxRadius + symbolSize;
