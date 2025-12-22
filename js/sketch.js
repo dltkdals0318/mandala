@@ -45,11 +45,18 @@ let prayerSound;
 let prayerFont;
 let titleFont;
 let decorFont;
-let mantraImg;
-let mantraImages = [];
 
 const MANDALA_COLORS = ["#fefff0", "#fffae3", "#fff1ae", "#ffec7b"];
 const TEXT_PATTERNS = ["circular"];
+const PRAYER_PETITIONS = [
+  "NAME",
+  "KINGDOM",
+  "WILL",
+  "BREAD",
+  "FORGIVENESS",
+  "TEMPTATION",
+  "DELIVERANCE",
+];
 
 let completionFlash = {
   active: false,
@@ -62,18 +69,22 @@ let RING_SPACING_RATIO = 0.72;
 let SYMBOL_SIZE_RATIO = 1.2;
 let DECOR_TEXT_RADIUS_RATIO = 0.6;
 let DECOR_TEXT_OFFSET = 0;
-let DECOR_TEXT_CENTER_X = 40;
-let DECOR_TEXT_CENTER_Y = -140;
+let DECOR_TEXT_CENTER_X = 0;
+let DECOR_TEXT_CENTER_Y = 0;
 let DECOR_TEXT_ROTATION_SPEED = 0.0125;
 
 let baseRadius = 150;
 let ringSpacing = 100;
 let symbolSize = 120;
-let symbolAspectRatio = 1;
 let lastUpdate = 0;
 const UPDATE_INTERVAL = 50;
 let testMode = false;
 let virtualUsers = [];
+
+// 별 효과 변수
+let stars = [];
+let lastStarTime = 0;
+let nextStarInterval = 0; // 첫 별은 즉시 생성
 
 const COMPLETION_TIME = 27000;
 const SYMBOLS_PER_MANTRA = 7;
@@ -157,29 +168,42 @@ const LORDS_PRAYER = [
 // ============================================
 
 function preload() {
-  for (let i = 0; i < 4; i++) {
-    const imageNumber = i + 1;
-    const index = i;
-    let img = loadImage(
-      `source/mandala${imageNumber}.png`,
+  // 7개의 독립적인 오디오 레이어 로드
+  for (let i = 0; i < MAX_LAYERS; i++) {
+    let layer = loadSound(
+      "source/pray.mp3",
       () => {
-        if (index === 0) {
-          symbolAspectRatio = mantraImages[0].width / mantraImages[0].height;
-        }
+        console.log(`audioLayer ${i} 로드 성공`);
       },
-      () => {}
+      (err) => {
+        console.error(`audioLayer ${i} 로드 실패:`, err);
+      }
     );
-    mantraImages[index] = img;
+    audioLayers.push(layer);
   }
-  mantraImg = mantraImages[0];
+
+  // 메인 prayerSound 로드
   prayerSound = loadSound(
     "source/pray.mp3",
-    () => {},
-    () => {}
+    () => {
+      console.log("prayerSound 로드 성공");
+    },
+    (err) => {
+      console.error("prayerSound 로드 실패:", err);
+    }
   );
+
+  // CSS에서 이미 로드된 폰트 사용
   prayerFont = "Ohmin";
   titleFont = "Ohmin";
   decorFont = "Tikkeul";
+}
+
+// 폰트 로딩 대기
+async function waitForFonts() {
+  if (document.fonts) {
+    await document.fonts.ready;
+  }
 }
 
 // ============================================
@@ -188,8 +212,11 @@ function preload() {
 
 function setup() {
   createCanvas(windowWidth, windowHeight, P2D);
-  textFont("Ohmin");
+  frameRate(60); // 프레임레이트 제한
   calculateResponsiveSizes();
+
+  // 폰트 로딩 대기
+  waitForFonts();
 
   const firebaseAvailable = typeof firebase !== "undefined";
   const configReady = isFirebaseConfigValid(firebaseConfig);
@@ -204,8 +231,6 @@ function setup() {
     initTestMode();
   }
   initAudio();
-  textAlign(LEFT, TOP);
-  textFont("monospace");
 }
 
 // ============================================
@@ -346,32 +371,44 @@ function cleanupStaleConnections(snapshot) {
 // ============================================
 
 function initAudio() {
-  audioLayers.forEach((layer) => {
-    if (layer) {
-      layer.loop();
-      layer.setVolume(0);
-    }
-  });
+  console.log("initAudio 호출, prayerSound 사용");
+
+  // prayerSound를 사용하여 7개의 독립적인 레이어 생성
+  audioLayers = [];
+  for (let i = 0; i < MAX_LAYERS; i++) {
+    // 각 레이어는 prayerSound를 복사한 새로운 인스턴스
+    audioLayers.push(prayerSound);
+  }
+
+  // prayerSound를 루프로 재생하되 볼륨 0으로 시작
+  if (prayerSound) {
+    prayerSound.loop();
+    prayerSound.setVolume(0);
+    console.log("prayerSound loop 시작, isPlaying:", prayerSound.isPlaying());
+  }
 }
 
 function updateAudioLayers(activeCount = 0) {
-  let layerIndex = 0;
+  if (!prayerSound) return;
 
+  // activeCount에 따라 볼륨 조절
   if (activeCount > 0) {
-    for (let uid in activeTouches) {
-      if (activeTouches[uid].active && layerIndex < MAX_LAYERS) {
-        if (audioLayers[layerIndex]) {
-          audioLayers[layerIndex].setVolume(1, 0.5);
-        }
-        layerIndex++;
-      }
-    }
-  }
+    // 최소 볼륨 0.3, 최대 볼륨 1.0
+    // 1명: 0.3, 2명: 0.5, 3명: 0.65, 7명: 1.0
+    let targetVolume = 0.3 + (activeCount / MAX_LAYERS) * 0.7;
+    targetVolume = Math.min(targetVolume, 1.0);
+    prayerSound.setVolume(targetVolume, 0.5);
 
-  for (let i = layerIndex; i < MAX_LAYERS; i++) {
-    if (audioLayers[i]) {
-      audioLayers[i].setVolume(0, 0.5);
+    if (frameCount % 60 === 0) {
+      console.log(
+        `updateAudioLayers - activeCount: ${activeCount}, 볼륨: ${targetVolume.toFixed(
+          2
+        )}, isPlaying:`,
+        prayerSound.isPlaying()
+      );
     }
+  } else {
+    prayerSound.setVolume(0, 0.5);
   }
 }
 
@@ -517,7 +554,9 @@ function draw() {
 
   updateAudioLayers(activeCount);
 
-  displayBottomSymbol();
+  // 별 효과 업데이트 및 렌더링
+  updateStars(activeCount);
+  drawStars();
 }
 
 // ============================================
@@ -571,32 +610,11 @@ function displayConnectionInfo(activeCount = 0) {
     fill(200, 200, 200, 200);
     textSize(10);
     textStyle(NORMAL);
-    text("테스트: 1-9", width / 2, 60);
+    text("테스트: 2-9", width / 2, 60);
   }
 
   textAlign(LEFT, BASELINE);
   textStyle(NORMAL);
-
-  pop();
-}
-
-// bottom symbol
-function displayBottomSymbol() {
-  if (!mantraImages[0]) return;
-
-  push();
-
-  let baseSize = min(width, height) * 0.125;
-
-  let imgWidth = baseSize * symbolAspectRatio;
-  let imgHeight = baseSize;
-
-  let symbolX = width / 2;
-  let symbolY = height - imgHeight / 2 - 30;
-
-  imageMode(CENTER);
-  image(mantraImages[0], symbolX, symbolY, imgWidth, imgHeight);
-  noTint();
 
   pop();
 }
@@ -750,7 +768,7 @@ function renderVisualLayers(activeCount = 0) {
 
     for (let j = 0; j < symbolCount; j++) {
       let angle = (j * TWO_PI) / symbolCount - HALF_PI;
-      drawMantraSymbol(angle, radius, 1.0, mantraAlpha, imageIndex);
+      drawMantraSymbol(angle, radius, 1.0, mantraAlpha, imageIndex, j);
     }
 
     pop();
@@ -800,104 +818,38 @@ function renderVisualLayers(activeCount = 0) {
     for (let i = 0; i < activeCount; i++) {
       let angle = (i * TWO_PI) / activeCount - HALF_PI;
       let alpha = 255;
-      drawMantraSymbol(angle, radius, 1.0, alpha, progressImageIndex);
+      drawMantraSymbol(angle, radius, 1.0, alpha, progressImageIndex, i);
     }
 
     pop();
   }
 }
 
-// Mandala symbol
-function drawMantraSymbol(angle, radius, scale, alpha, imageIndex = null) {
-  if (mantraImages.length === 0) return;
-
+// Mandala symbol - 단순한 점으로 표시
+function drawMantraSymbol(
+  angle,
+  radius,
+  scale,
+  alpha,
+  imageIndex = null,
+  charIndex = 0
+) {
   push();
   translate(width / 2, height / 2);
   rotate(angle);
 
-  // DECOR_TEXT_OFFSET
-  let adjustedRadius = radius + DECOR_TEXT_OFFSET;
-  translate(adjustedRadius, 0);
-  rotate(HALF_PI + PI);
+  translate(radius, 0);
 
   let finalScale = scale;
-  let imgWidth = symbolSize * symbolAspectRatio * finalScale;
-  let imgHeight = symbolSize * finalScale;
+  let dotSize = 8 * finalScale;
 
-  // image selection
-  let selectedImage;
-  if (
-    imageIndex !== null &&
-    imageIndex >= 0 &&
-    imageIndex < mantraImages.length
-  ) {
-    selectedImage = mantraImages[imageIndex];
-  } else {
-    selectedImage = mantraImages[0];
-  }
+  let mandalaColor = MANDALA_COLORS[imageIndex % MANDALA_COLORS.length];
+  let c = color(mandalaColor);
 
-  if (!selectedImage) {
-    pop();
-    return;
-  }
-
-  // draw
-  tint(255, alpha);
-  imageMode(CENTER);
-  image(selectedImage, 0, 0, imgWidth, imgHeight);
-  noTint();
-
-  drawDecorativeText(imgWidth, imgHeight, alpha, imageIndex);
-
-  pop();
-}
-
-// decorative text around symbol
-function drawDecorativeText(imgWidth, imgHeight, alpha, seedIndex) {
-  let words = [
-    "NAME",
-    "KINGDOM",
-    "WILL",
-    "BREAD",
-    "FORGIVENESS",
-    "TEMPTATION",
-    "DELIVERANCE",
-  ];
-  let wordCount = words.length;
-
-  let decorRadius = imgWidth * DECOR_TEXT_RADIUS_RATIO;
-
-  let mandalaColor = MANDALA_COLORS[seedIndex % MANDALA_COLORS.length];
-
-  push();
-  textAlign(CENTER, CENTER);
-  if (decorFont) {
-    textFont(decorFont);
-  }
-
-  for (let i = 0; i < wordCount; i++) {
-    let baseAngle = (i * TWO_PI) / wordCount - HALF_PI;
-    let rotationOffset = frameCount * DECOR_TEXT_ROTATION_SPEED;
-    let angle = baseAngle + rotationOffset;
-
-    let x = cos(angle) * decorRadius + DECOR_TEXT_CENTER_X;
-    let y = sin(angle) * decorRadius + DECOR_TEXT_CENTER_Y;
-
-    push();
-    translate(x, y);
-
-    let textRotation = angle + HALF_PI;
-    rotate(textRotation);
-
-    let textSizeVal = imgWidth * 0.09;
-
-    let c = color(mandalaColor);
-    fill(red(c), green(c), blue(c), alpha * 0.95);
-    noStroke();
-    textSize(textSizeVal);
-    text(words[i], 0, 0);
-    pop();
-  }
+  // 작은 점으로 표시
+  fill(red(c), green(c), blue(c), alpha);
+  noStroke();
+  ellipse(0, 0, dotSize, dotSize);
 
   pop();
 }
@@ -1321,4 +1273,60 @@ function keyPressed() {
       return false;
     }
   }
+}
+
+// ============================================
+// 별 효과 시스템
+// ============================================
+
+function updateStars(activeCount) {
+  let currentTime = millis();
+
+  if (activeCount === 0) {
+    if (currentTime - lastStarTime > nextStarInterval) {
+      createStar();
+      lastStarTime = currentTime;
+      // 30초~50초 사이 랜덤 간격 설정
+      nextStarInterval = random(30000, 50000);
+      console.log(
+        `별 생성됨, 다음 별까지: ${(nextStarInterval / 1000).toFixed(1)}초`
+      );
+    }
+  }
+}
+
+function createStar() {
+  let x = random(width);
+  let y = random(height);
+
+  let colorIndex = floor(random(MANDALA_COLORS.length));
+  let selectedColor = color(MANDALA_COLORS[colorIndex]);
+
+  let star = {
+    x: x,
+    y: y,
+    r: red(selectedColor),
+    g: green(selectedColor),
+    b: blue(selectedColor),
+    birthTime: millis(),
+    alpha: 255,
+    size: random(3, 15),
+  };
+
+  stars.push(star);
+}
+
+function drawStars() {
+  push();
+
+  for (let star of stars) {
+    noStroke();
+
+    fill(star.r, star.g, star.b, star.alpha);
+    ellipse(star.x, star.y, star.size * 0.1, star.size);
+
+    ellipse(star.x, star.y, star.size, star.size * 0.1);
+  }
+
+  pop();
 }
